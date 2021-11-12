@@ -1,0 +1,91 @@
+#define _GNU_SOURCE
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <assert.h>
+#include <stdbool.h>
+#include <math.h>
+#include <string.h>//for strstr and strcpy
+#include <ctype.h> //for tolower
+#include <signal.h>
+#include <sys/wait.h>
+
+typedef struct block{
+
+    size_t size;
+    int valid;
+    block* next;
+    block* prev;
+
+}block;
+
+void *heap;
+int typfit;
+
+void myinit(int allocAlg){
+
+    typfit = allocAlg;
+
+    size_t size = 1 << 20 ; // 10000000... = 1 mb or 1 mill bits
+
+    *heap = malloc( size);
+
+    // top creates like the empty array that we have to give the suff when they call 
+    //  1000000 bits = 
+
+
+}
+
+void* mymalloc(size_t size){
+    
+
+     
+    if(typfit == 0){ //first fit
+        end = 
+        p = heap[0];
+        
+        while((p < end) &&
+        ((*p & 1) ||
+        (*p <= len ) ) ){
+
+        }
+
+    }else if (typfit == 1){ // next fit
+
+
+    }else{ // best fit
+
+
+
+
+    }
+
+}
+
+void myfree(void* ptr){
+
+
+}
+
+void* myrealloc(void* ptr, size_t size){
+
+
+}
+
+void mycleanup(){
+
+
+
+}
+
+double utilization(){
+
+
+
+
+}
+
