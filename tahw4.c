@@ -1,3 +1,7 @@
+//
+// Created by Vianney Padonou on 11/16/21.
+//
+
 #define _GNU_SOURCE
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -63,7 +67,7 @@ void split(block *fitting_slot,size_t size){
 
      }
 
-void* mymalloc(size_t size) {
+void* mymalloc(size_t size, int algo) {
 
     block *p;
     void *toreturn;
@@ -71,18 +75,22 @@ void* mymalloc(size_t size) {
     if (!freelist)
         myinit(0);
 
+    typfit =algo;
+
     if (typfit == 0) { //first fit
         ////Start at the beginning of free list
         p = freelist;
         //// find first block. while loop.
-        while ((p->size < size || p->valid == 0) && p->next != NULL)
+        while ((p->size < size || p->valid == 0) && p->next != NULL){
             p = p->next;
+        printf("One block checked\n");}
         /// if size equals , allocate
         if (p->size == size) {
             p->valid = 1;
-            toreturn = (void *) (p + sizeof(block));
+            toreturn = (void *)(p + sizeof(block));
             lastAllocatedBlock = freelist;
             freelist = freelist->next;
+            lastfreeBlock =freelist;
             printf("block malloced\n");
             return toreturn;
 
@@ -92,7 +100,8 @@ void* mymalloc(size_t size) {
             toreturn = (void *) (p + sizeof(block));// p point on newly allocated block
             lastAllocatedBlock = freelist;
             freelist = freelist->next;
-            printf("block malloced\n");
+            lastfreeBlock =freelist;
+            printf("block malloced with split\n");
             return toreturn;
         } else {
             printf("Error\n");
@@ -102,23 +111,26 @@ void* mymalloc(size_t size) {
     } else if (typfit == 1) { // next fit
         block *current, nestBestBlock;
         current = lastfreeBlock;
-        while ((current->size < size || current->valid == 0) && current->next != NULL)
+        while ((current->size < size || current->valid == 0) && current->next != NULL){
             current = current->next;
-        if (p->size == size) {
-            p->valid = 1;
+        printf("One block checked\n");}
+        if (current->size == size) {
+            current->valid = 1;
             toreturn = (void *) (p + sizeof(block));
             lastAllocatedBlock = freelist;
             freelist = freelist->next;
+            lastfreeBlock =freelist;
             printf("block malloced\n");
             return toreturn;
 
         } else if (p->size > size) {
             /// if not , split and allocate
-            split(p, size);
-            toreturn = (void *) (p + sizeof(block));// p point on newly allocated block
+            split(current, size);
+            toreturn = (void *) (current + sizeof(block));// p point on newly allocated block
             lastAllocatedBlock = freelist;
             freelist = freelist->next;
-            printf("block malloced\n");
+            lastfreeBlock =freelist;
+            printf("block malloced with split\n");
             return toreturn;
         }
 
@@ -164,7 +176,7 @@ void MyFree(void* ptr){
     struct block* temp;
     --curr;
 
-    if (--curr->valid==0 )
+    if (curr->valid==0 )
         printf("\"error: not a heap pointer\n");
     else if(curr-> valid==1)
         printf("Error double free\n");
@@ -188,8 +200,12 @@ void MyFree(void* ptr){
 
 //double utilization(){};
 int main(){
-   int* p= mymalloc(500);
+   int* p= mymalloc(500,0);
+   double * d= mymalloc(400,1);
 
    MyFree(p);
+   MyFree(d);
+    char* c= mymalloc(850,0);
+    MyFree(c);
 
 }
