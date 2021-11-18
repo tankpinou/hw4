@@ -1,7 +1,3 @@
-//
-// Created by Vianney Padonou on 11/16/21.
-//
-
 #define _GNU_SOURCE
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -30,6 +26,8 @@ typedef struct block{
 void *heap;
 int typfit;
 block*  freelist;
+block* lastAllocatedBlock;
+block* lastfreeBlock;
 
 void myinit(int allocAlg){
 
@@ -46,6 +44,10 @@ void myinit(int allocAlg){
     freelist->valid =1;
     freelist->next =NULL;
     freelist->prev = NULL;
+
+    lastfreeBlock=freelist;
+
+    printf("Initialized\n");
 }
 
 void split(block *fitting_slot,size_t size){
@@ -55,28 +57,21 @@ void split(block *fitting_slot,size_t size){
     new->next=fitting_slot->next;
     new->prev=fitting_slot; // dont care  because the previous just got allocated
 
-
     fitting_slot->size=size;
     fitting_slot->valid=0;
     fitting_slot->next=new;//  the curr_fitting_slot point to the next free block
 
      }
 
-
-block* lastAllocatedBlock;
-block* lastfreeBlock;
-
-
 void* mymalloc(size_t size) {
 
     block *p;
     void *toreturn;
 
-    if (typfit == 0) { //first fit
-        // end = freelist+s
-        // p = heap[0]; // or freelist
-        // while((p < end) && ((*p & 1) || (*p <= len ) ) ){
+    if (!freelist)
+        myinit(0);
 
+    if (typfit == 0) { //first fit
         ////Start at the beginning of free list
         p = freelist;
         //// find first block. while loop.
@@ -84,73 +79,117 @@ void* mymalloc(size_t size) {
             p = p->next;
         /// if size equals , allocate
         if (p->size == size) {
-            p->valid=0;
-            toreturn = (void*)(p+sizeof(block));
-            //lastAllocatedBlock = p.....;
-            //lastfreeBlock = freelist= p.next;
+            p->valid = 1;
+            toreturn = (void *) (p + sizeof(block));
+            lastAllocatedBlock = freelist;
+            freelist = freelist->next;
+            printf("block malloced\n");
             return toreturn;
 
         } else if (p->size > size) {
             /// if not , split and allocate
             split(p, size);
-            toreturn = (void *)(p+sizeof(block)); // p point on newly allocated block
-            //lastAllocatedBlock = p;
-            //lastfreeBlock = freelist = p->next;
-            //return pointer to free space
-            //coalesce if possible
+            toreturn = (void *) (p + sizeof(block));// p point on newly allocated block
+            lastAllocatedBlock = freelist;
+            freelist = freelist->next;
+            printf("block malloced\n");
             return toreturn;
         } else {
             printf("Error\n");
+            return toreturn;
         }
-        //split(p,size);
-
-        // p = p+ (*p & -2);
 
     } else if (typfit == 1) { // next fit
-        block* current, nestBestBlock;
-        void* toreturn;
+        block *current, nestBestBlock;
+        current = lastfreeBlock;
+        while ((current->size < size || current->valid == 0) && current->next != NULL)
+            current = current->next;
+        if (p->size == size) {
+            p->valid = 1;
+            toreturn = (void *) (p + sizeof(block));
+            lastAllocatedBlock = freelist;
+            freelist = freelist->next;
+            printf("block malloced\n");
+            return toreturn;
 
-        // while((p < end) &&
-        //  ((*p & 1) ||
-        //  (*p <= len ) ) ){
-
-        //  p = p+ (*p & -2);
+        } else if (p->size > size) {
+            /// if not , split and allocate
+            split(p, size);
+            toreturn = (void *) (p + sizeof(block));// p point on newly allocated block
+            lastAllocatedBlock = freelist;
+            freelist = freelist->next;
+            printf("block malloced\n");
+            return toreturn;
+        }
 
     } else { // best fit
-        block* current, bestBlock;
-        void* toreturn;
+        block *current, *bestBlock;
+        current = freelist;
+        bestBlock = current;
 
+        while ((current->size != size || current->valid == 0) && current->next != NULL) {
+
+            if (current->size >= size && current->size <= bestBlock->size) {
+                bestBlock = current; //nice
+            }
+            current = current->next;
+        }
+        bestBlock->valid = 0;
+        toreturn = bestBlock + sizeof(block);
+        lastfreeBlock = freelist;
+        printf("block malloced\n");
+        return toreturn;
+    }
+    return toreturn;
+
+}
+
+void coalesce(){
+    struct block *curr,*prev;
+    curr=freelist;
+    while((curr->next)!=NULL){
+        if((curr->valid) && (curr->next->valid) && ((curr+curr->size)==curr->next) ){ // to be checked
+            curr->size+=(curr->next->size)+sizeof(struct block);
+            curr->next=curr->next->next;
+            printf("successful Merge\n");
+        }
+        prev=curr;
+        curr=curr->next;
 
     }
 }
 
+void MyFree(void* ptr){
+    struct block* curr=ptr;
+    struct block* temp;
+    --curr;
 
+    if (--curr->valid==0 )
+        printf("\"error: not a heap pointer\n");
+    else if(curr-> valid==1)
+        printf("Error double free\n");
+    else {//(((void*)freeList<=ptr)) {//&&(ptr<=(void*)(freeList+1048576))){
+         // change of address pointer
+        curr->valid=1;
+       // if (curr->next && curr->next->valid==1) // || (curr->prev && curr->prev->valid==1))
+            coalesce();
+        printf("pointer freed\n");
 
-
-void myfree(void* ptr){
-
-    //check if valid ptr
-    block* p;
-    p = (block*)ptr-1;
-
-
-
+        curr->prev = freelist->prev;
+        curr->next = freelist;
+        freelist = curr; // nice
+        // add blocks at  the beginning of free list
+    }
 }
 
-void* myrealloc(void* ptr, size_t size){
+//void* myrealloc(void* ptr, size_t size){};
 
+//void mycleanup(){}
 
-}
+//double utilization(){};
+int main(){
+   int* p= mymalloc(500);
 
-void mycleanup(){
-
-
-
-}
-
-double utilization(){
-
-
-
+   MyFree(p);
 
 }
