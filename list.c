@@ -1,6 +1,3 @@
-//
-// Created by Vianney Padonou on 11/6/21.
-//
 #define _GNU_SOURCE
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -165,11 +162,13 @@ void coalesce(){
         if((curr->free) && (curr->next->free)){
             curr->size+=(curr->next->size)+sizeof(struct block);
             curr->next=curr->next->next;
+            printf("successful Merge\n");
         }
         prev=curr;
         curr=curr->next;
+
     }
-    printf("successful Merge\n");
+
 }
 /*
 void *MyRealloc(void* ptr, int size) {
@@ -183,9 +182,11 @@ void MyFree(void* ptr){
     if(ptr){//(((void*)freeList<=ptr)) {//&&(ptr<=(void*)(freeList+1048576))){
         struct block* curr=ptr;
         struct block* temp;
-        --curr;
-        curr->free=1;
-       // coalesce();
+        --curr;  // change of address pointer
+        curr->free=0;
+        if( (curr->next && curr->next->free==0)  || (curr->previous && curr->previous->free==0))
+        coalesce();
+        printf("pointer freed\n");
 
         curr->previous = freeList->previous;
         curr->next = freeList;
