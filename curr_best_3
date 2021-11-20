@@ -1,0 +1,325 @@
+#define _GNU_SOURCE
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <assert.h>
+#include <stdbool.h>
+#include <math.h>
+#include <string.h>//for strstr and strcpy
+#include <ctype.h> //for tolower
+#include <signal.h>
+#include <sys/wait.h>
+
+typedef struct block{
+
+    size_t size;
+    int valid;
+    struct block* next;
+    struct block* prev;
+
+}block;
+
+void *heap;
+int typfit;
+block*  freelist;
+block* lastAllocatedBlock;
+block* lastfreeBlock;
+
+void myinit(int allocAlg){
+
+    typfit = allocAlg; //  ?change before submitting
+
+    size_t size = 1 << 20 ; // 10000000... = 1 mb or 1 mill bits
+
+    heap = malloc(size);
+
+    // top creates like the empty array that we have to give the suff when they call
+    //  1000000 bits =
+    freelist = heap;
+    freelist->size  = size ;//-(sizeof(freelist));
+    freelist->valid =1;
+    freelist->next =NULL;
+    freelist->prev = NULL;
+
+    lastfreeBlock=freelist;
+
+    printf("Initialized\n");
+}
+//if the memory data is 8 bytes aligned, it means:
+//sizeof(the_data) % 8 == 0.
+
+void split(block *fitting_slot,size_t size){
+    block *new=(void*)((void*)fitting_slot+size+sizeof(block)); // bytes further in memory
+    new->size=(fitting_slot->size)-size-sizeof( block);
+    new->valid=1;
+    new->next=fitting_slot->next;
+    new->prev=fitting_slot->prev; // dont care  because the previous just got allocated
+
+    fitting_slot->size=size;
+    fitting_slot->valid=0;
+    fitting_slot->next=new;//  the curr_fitting_slot point to the next free block
+
+   // lastAllocatedBlock = fitting_slot;
+
+     }
+int tot ;
+int count;
+bool is_aligned(void *p, int N)
+{
+    return (int)p % N == 0;
+}
+
+void* mymalloc(size_t size, int algo) {
+
+    block *p;
+    void *toreturn;
+    tot+= tot;
+    count ++;
+    if (!freelist)
+        myinit(0);
+
+   // typfit =algo;
+
+    if (typfit == 0) { //first fit
+        ////Start at the beginning of free list
+        p = freelist;
+        //// find first block. while loop.
+        while ((p->size < size || p->valid == 0) && p->next != NULL)//{
+            p = p->next;
+       // printf("One block checked\n");}
+        /// if size equals , allocate
+        if (p->size == size) {
+            p->valid = 0;
+
+           // printf("address:%p.\n",(void*)p);
+
+            toreturn = (void*)(p+sizeof(block));
+          //  printf("return address:%p.\n",toreturn);
+            if(is_aligned(toreturn,8))
+                printf(" 8 bytes aligned address\n");
+            lastAllocatedBlock = freelist;
+            freelist = freelist->next;
+            lastfreeBlock =freelist;
+            printf("exact block malloced\n");
+            return toreturn;
+
+        } else if (p->size > size) {
+            /// if not , split and allocate
+            split(p, size);
+           // printf("address:%p.\n",(void*)p);
+            toreturn = (++p);// p point on newly allocated block
+
+           // printf("return address:%p.\n",toreturn);
+
+            if(is_aligned(toreturn,8))
+                printf(" 8 bytes aligned address\n");
+            lastAllocatedBlock = freelist;
+            freelist = freelist->next;
+            lastfreeBlock = freelist;
+            printf("block malloced with split\n");
+            return toreturn;
+        } else {
+            printf("Error: not enough space\n");
+            return toreturn;
+        }
+
+    } else if (typfit == 1) { // next fit
+        block *current, nestBestBlock;
+        current = lastfreeBlock;
+        while ((current->size < size || current->valid == 0) && current->next != NULL)//{
+            current = current->next;
+      //  printf("One block checked\n");}
+        if (current->size == size) {
+            current->valid = 0;
+           // printf("address:%p.\n",(void*)p);
+
+            toreturn = (void *) (p + sizeof(block));
+            if(is_aligned(toreturn,8))
+                printf(" 8 bytes aligned address\n");
+            lastAllocatedBlock = freelist;
+            freelist = freelist->next;
+            lastfreeBlock =freelist;
+            printf("exact block malloced\n");
+            return toreturn;
+
+        } else if (p->size > size) {
+            /// if not , split and allocate
+            split(current, size);
+            //printf("address:%p.\n",(void*)p);
+
+            toreturn = (void *) (++current);// p point on newly allocated block
+            if(is_aligned(toreturn,8))
+                printf(" 8 bytes aligned address\n");
+            lastAllocatedBlock = freelist;
+            freelist = freelist->next;
+            lastfreeBlock =freelist;
+            printf("block malloced with split\n");
+            return toreturn;
+        }else {
+            printf("Error: not enough space\n");
+            return toreturn;
+        }
+
+    } else { // best fit
+        block *current, *bestBlock;
+        current = freelist;
+        bestBlock = current;
+
+        while ((current->size >= size || current->valid == 0) && current->next != NULL) {
+
+            if (current->size >= size && current->size <= bestBlock->size) {
+                bestBlock = current; //nice
+            }
+            current = current->next;
+        }
+        bestBlock->valid = 0;
+       // printf("address:%p.\n",(void*)p);
+
+        toreturn = (++bestBlock);//+sizeof(block);
+        if(is_aligned(toreturn,8))
+            printf(" 8 bytes aligned address\n");
+        lastAllocatedBlock = freelist;
+        lastfreeBlock = freelist;
+        printf("block malloced\n");
+        if(bestBlock->size<size)
+        {
+            printf("Error: not enough space\n");
+        }
+
+        return toreturn;
+
+    }
+    return toreturn;
+
+}
+
+void coalesce(){
+    struct block *curr,*prev;
+    curr=freelist;
+    while((curr->next)!=NULL){
+        if((curr->valid) && (curr->next->valid) && ((curr+curr->size)==curr->next) ){ // to be checked
+            curr->size+=(curr->next->size)+sizeof(struct block);
+            curr->next=curr->next->next;
+            printf("successful Merge\n");
+        }
+        prev=curr;
+        curr=curr->next;
+
+    }
+}
+
+void MyFree(void* ptr){
+
+    if(ptr ==NULL)
+        return;
+
+    struct block* curr=ptr;
+    struct block* temp;
+    --curr;//=curr-sizeof(block);
+
+    tot -= curr->size;
+   count--;
+
+   // printf("valid value: %d",curr->valid);
+
+    if (!curr)
+        printf("\"error: not a heap pointer\n");
+    else if(curr-> valid==1)
+        printf("Error double free\n");
+    else if (curr->valid==0 ) {//(((void*)freeList<=ptr)) {//&&(ptr<=(void*)(freeList+1048576))){
+         // change of address pointer
+        curr->valid=1;
+       // if (curr->next && curr->next->valid==1) // || (curr->prev && curr->prev->valid==1))
+            coalesce();
+        printf("pointer freed\n");
+
+        curr->prev = freelist->prev;
+        curr->next = freelist;
+        freelist = curr; // nice
+        // add blocks at  the beginning of free list
+    }
+}
+
+void mycleanup(){
+    free(heap);
+    typfit = -1;
+    tot =0;
+    count=0;
+}
+void* myrealloc(void* ptr, size_t size) {
+
+    //Allocate a new memory region of the requested size.
+    // Copy the content of the existing memory region to the new region.
+    //Deallocate (free) the existing memory region.
+    block* curr=ptr;
+   --curr;
+    void* toreturn;
+
+    tot -= curr->size;
+    tot += size;
+    printf("here\n");
+   // printf("valid value: %d\n",curr->valid);
+
+    if(ptr == NULL  && size ==0){
+        printf("here1\n");
+        return NULL;
+    }else if (size == 0){ // and ptr is valid
+        printf("here2\n");
+        MyFree(ptr);
+        return NULL;
+
+    }else if (ptr ==NULL){
+        printf("here3\n");
+        mymalloc(size,0);
+        printf("Can't reallocate null pointer");
+        return toreturn;
+    }else if (curr->valid==0){ //then we actually have to realloc
+        printf("here4\n");
+        void *p;
+        p = mymalloc(size, 0);
+        size_t  sizeTocopy;
+        size_t originalSize = curr->size;
+       // p = memcpy(p, ptr, ((block*)ptr)->size);
+        if (originalSize<size)
+            sizeTocopy=originalSize;
+        else
+            sizeTocopy = size;
+        printf("p old address: %p\n",ptr);
+        memmove(p, ptr, sizeTocopy);
+        MyFree(ptr);
+        printf("Memory correctly realloced. new address: %p\n",p);
+        return p;
+    }
+    return toreturn;
+}
+
+
+//void mycleanup(){}
+
+void utilization(){
+printf("%d\n", tot/(tot+(32*count)));
+//
+ }
+
+
+int main(){
+   int* p= mymalloc(700,0);
+   double * d= mymalloc(850,2);
+
+   // printf("address:%p.\n",p);
+    //printf("address:%p.\n",d);
+   //MyFree((p));
+
+  p =  myrealloc(p, 1700);
+   // printf("new realloc address:%p.\n",p);
+
+    d =  myrealloc(d, 1700);
+
+    MyFree(p);
+    MyFree(d);
+
+}
