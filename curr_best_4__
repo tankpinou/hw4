@@ -354,7 +354,7 @@ int main(){
     double totut = 0;
    // totut += utilization();
 
-    for (int i = 0; i < 1; i++) {
+    for (int i = 0; i < 3; i++) {
         start = time(NULL);
         randomSize = rand()%256;// was rand()%50; but for testing it we are doing 56
        for (int j = 0; j < 60000; j++) { // 7* 47619 === 333333 * 3 ==1000000
