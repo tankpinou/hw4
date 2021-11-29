@@ -1,0 +1,310 @@
+// all includes 
+typedef struct block {
+    size_t size;
+    int valid;
+    struct block* next;
+} block;
+
+
+void *heap;
+int typeFit;
+block*  freeList;
+block* lastAllocatedBlock;
+block* lastFreeBlock;
+
+
+void myinit(int allocAlg) {
+    typeFit = allocAlg;  // ?change before submitting
+    size_t size = 1 << 20 ; // 10000000... = 1 mb or 1 mill bits
+
+    heap = malloc(size);
+
+    // top creates like the empty array that we have to give the suff when they call
+    freeList = heap;
+    freeList->size  = size - sizeof(block) ; //-(sizeof(freeList));
+    freeList->valid = 1;
+    freeList->next = NULL;
+
+    lastFreeBlock = freeList;
+}
+
+
+void split(block *fittingSlot, size_t size) {
+    block *newBlock = (void*)((void*)fittingSlot + size + sizeof(block)); // bytes further in memory
+    if(newBlock){
+        newBlock->size = (fittingSlot->size) - size - sizeof(block);
+        newBlock->valid = 1;
+        newBlock->next = fittingSlot->next;
+
+        fittingSlot->size = size;
+        fittingSlot->valid = 0;
+        fittingSlot->next = newBlock;//  the curr_fitting_slot point to the next free block
+     }
+    else{
+        printf("last block reached");
+    }
+}
+
+
+size_t tot ;
+size_t count;
+// bool is_aligned(void *p, int N){
+//     return (int)p % N == 0;
+// }
+
+void* mymalloc(size_t size) {
+    block *p;
+    void *toReturn;
+    tot+= tot;
+    count ++;
+
+    if ((typeFit == 0) || (typeFit == 1)) { //first fit
+        // Start at the beginning of free list
+        if (typeFit == 0) p = freeList;
+        else p = lastFreeBlock;
+        // find first block. while loop.
+        while ((p->size < size || p->valid == 0) && p->next != NULL) {
+            p = p->next;
+      
+        }
+        /// if size equals , allocate
+        if (p->size == size) {
+            p->valid = 0;
+            toReturn = (void*)(p + 1);
+            lastAllocatedBlock = p;
+            printf("exact block malloced\n");
+            return toReturn;
+        } 
+        else if (p->size > (size + sizeof(block))) {
+            // if not ,split and allocate
+            split(p, size);
+            toReturn = (void*)(p + 1);// p point on newly allocated block
+            lastAllocatedBlock = p;
+            return toReturn;
+        } else {
+            printf("Error: not enough space\n");
+            return NULL;
+        }
+    } 
+    else {  // Best fit
+        p = freeList;
+        size_t minRemainSpace = 0;
+        block* bestFitHeader = NULL;
+
+        while (true) {
+            // Only check possible blocks
+            if ((p->valid == 1) && (p->size >= size)) {
+                // Return if exactly matched
+                if (p->size == size) {
+                    p->valid = 0;
+                    toReturn = (void*)(p + 1);
+                    lastAllocatedBlock = p;
+                    printf("Exact block malloced.\n");
+                    return toReturn;
+                }
+                else {
+                    if (p->size > (size + sizeof(block))) {
+                        size_t remainSpace = p->size - (size + sizeof(block));
+                        if (minRemainSpace >= remainSpace || minRemainSpace == 0) {
+                            minRemainSpace = remainSpace;
+                            bestFitHeader = p;
+                        }
+                    }
+                }
+            }
+
+            // Move on
+            if (p->next != NULL) p = p->next;
+            else {
+                break;
+            }
+        }
+
+        // Output
+        if (bestFitHeader == NULL) {
+            printf("Error: not enough space.\n");
+            return NULL;
+        }
+        else {
+            split(bestFitHeader, size);
+            toReturn = (void*)(bestFitHeader + 1);// p point on newly allocated block
+            lastAllocatedBlock = bestFitHeader;
+            return toReturn;
+        }
+    }
+    return toReturn;
+}
+
+
+void coalesce(){
+    block* curr = freeList;
+    while((curr)!= NULL && (curr->next) != NULL) {
+        if((curr->valid) == 1 && (curr->next->valid) == 1) { // to be checked
+            curr->size += (curr->next->size) + sizeof(block);
+            curr->next = curr->next->next;
+        }
+        curr = curr->next;
+    }
+}
+
+
+void myfree(void* ptr2Free) {
+    if(ptr2Free == NULL)  // or isnt valid)
+        return;
+
+    block* header2Free = ptr2Free - sizeof(block);
+
+    // tot -= header2Free->size;
+    // count--;
+
+    if (!header2Free)
+        printf("\"error: not a heap pointer\n");
+    else if(header2Free->valid == 1)
+        printf("Error double free\n");
+    else if (header2Free->valid == 0) {
+        // change of address pointer
+        header2Free->valid = 1;
+        lastFreeBlock = header2Free;
+        coalesce();
+    }
+}
+
+
+void* myrealloc(void* ptr2Remalloc, size_t size) {
+    block* header2Remalloc = ptr2Remalloc - sizeof(block);
+    void* toReturn;
+    
+    // tot -= header2Remalloc->size;
+    // tot += size;
+    
+    if(ptr2Remalloc == NULL && size == 0) {
+        return NULL;
+    } 
+    else if (size == 0) {
+        myfree(ptr2Remalloc);
+        return NULL;
+    } 
+    else if (ptr2Remalloc == NULL){
+        toReturn = mymalloc(size);
+        return toReturn;
+    }
+    else if (header2Remalloc->valid == 0) { 
+        void *p = mymalloc(size);
+        size_t sizeTocopy;
+        size_t originalSize = header2Remalloc->size;
+        
+        if (originalSize < size)
+            sizeTocopy = originalSize;
+        else
+            sizeTocopy = size;
+
+        memmove(p, ptr2Remalloc, sizeTocopy);
+        myfree(ptr2Remalloc);
+
+        return p;
+    }
+    return toReturn;
+}
+
+
+void mycleanup(){
+    free(heap);
+    typeFit = -1;
+    // tot = 0;
+    // count = 0;
+}
+
+//void mycleanup(){}
+int sizeAlignment(int sizeToAlign){
+    while ((sizeToAlign % 8 != 0))
+        sizeToAlign=sizeToAlign+1;
+
+    return sizeToAlign;
+};
+
+
+double utilization(){
+//printf("%d\n",(int)(tot/(tot+(32*count))));
+    return (double)(tot/(tot+(32*count)));
+//
+ }
+
+int main(){
+    // int* p= mymalloc(700, 3);
+    // char* d= (char*)mymalloc(20 *sizeof (char), 20);
+    // // d="wo";
+    // strcpy(d, "hello");
+    // // printf("%s\n",d);
+    // myfree(d);
+    // myfree(p);
+    // mycleanup();
+
+    int randomSize;
+    int utilisation;
+    int number_of_operations = 0, time_diff;
+    time_t start;
+    time_t end;
+    struct timeval tv;
+    // char* p;
+    // for each
+    double totut = 0;
+   // totut += utilization();
+
+    for (int i = 0; i < 1; i++) {
+        start = time(NULL);
+        randomSize = rand()%256;// was rand()%50; but for testing it we are doing 56
+        myinit(i);
+        // int *a = mymalloc(randomSize);
+        // randomSize = rand()%256;
+        // int *b = mymalloc(randomSize);
+        // randomSize = rand()%256;
+        // int *c = mymalloc(randomSize);
+        // randomSize = rand()%256;
+        // int *d = mymalloc(randomSize);
+        int *a,*b,*c,*d;
+
+        int* lists[] = {a,b,c,d};
+        for (int j = 0; j < 100; j++) { // 7* 47619 === 333333 * 3 ==1000000
+
+            int x = rand()%4;
+
+            randomSize = rand()%256;
+
+            if( !lists[x] )
+                lists[x] = mymalloc(randomSize);
+
+            randomSize = rand()%256;
+            x = rand()%4;
+
+            if(lists[x] != NULL && lists[x])
+                lists[x] = myrealloc(lists[x] , randomSize );
+            
+            //d = myrealloc(d , randomSize );
+            //randomSize = randomSize+8;
+            //int *p = myrealloc(d, randomSize);
+            x = rand()%4;
+
+            if(lists[x] != NULL)
+                myfree(lists[x]);
+            
+        }
+        mycleanup();
+        time_t end = time(NULL);
+        //  printf("time passed %ld in seconds\n", (end- start));
+
+    //   if(i==0){
+    //       printf("First fit throughput:%ld ops/sec\n",(60000/(end- start))); //operations 5 * j_max * I_max
+    //       printf("First fit utilization: \n");
+    //   }else if(i==1){
+    //       printf("Next fit throughput:%ld ops/sec\n",(60000/(end- start)));
+    //       printf("Next fit utilization: \n");
+    //   }else if(i==2){
+    //       printf("best fit throughput:%ld ops/sec\n",(60000/(end- start)));
+    //       printf("best fit utilization: \n");
+    //   }
+
+    }
+    
+
+
+}
